@@ -8,8 +8,8 @@
 #define YSIZE 2048
 
 /* Divide the problem into blocks of BLOCKX x BLOCKY threads */
-#define BLOCKY 8
-#define BLOCKX 8
+#define BLOCKY 32
+#define BLOCKX 32
 
 #define MAXITER 255
 
@@ -29,8 +29,27 @@ typedef struct {
 #define PIXEL(i,j) ((i)+(j)*XSIZE)
 
 /********** SUBTASK1: Create kernel device_calculate *************************/
+//Global variables need to be set as parameters but defines are handled by the compiler.
+__global__ void device_calculate(int *pixelBuffer, double xleft, double yupper, double step){
 
-//Insert code here
+	// Get pixel position to calculate
+	int i = blockIdx.x * BLOCKX + threadIdx.x;
+	int j = blockIdx.y * BLOCKY + threadIdx.y;
+
+	// Copy of host_calculation of computation for individual pixels
+	my_complex_t c,z,temp;
+	int iter=0;
+	c.real = (xleft + step*i);
+	c.imag = (yupper - step*j);
+	z = c;
+	while(z.real*z.real + z.imag*z.imag < 4.0) {
+		temp.real = z.real*z.real - z.imag*z.imag + c.real;
+		temp.imag = 2.0*z.real*z.imag + c.imag;
+		z = temp;
+		if(++iter==MAXITER) break;
+	}
+	pixelBuffer[PIXEL(i,j)]=iter;
+}
 
 /********** SUBTASK1 END *****************************************************/
 
@@ -121,14 +140,19 @@ int main(int argc,char **argv) {
 
 	/********** SUBTASK2: Set up device memory *******************************/
 
-	// Insert code here
+	int *device_pixelBuffer;
+
+	cudaMalloc((void**)&device_pixelBuffer, sizeof(int)*XSIZE*YSIZE);
 
 	/********** SUBTASK2 END *************************************************/
 
 	start=walltime();
 	/********** SUBTASK3: Execute the kernel on the device *******************/
 
-	//Insert code here
+	dim3 gridBlock(XSIZE/BLOCKX, YSIZE/BLOCKY);
+	dim3 threadBlock(BLOCKX, BLOCKY);
+
+	device_calculate<<<gridBlock,threadBlock>>>(device_pixelBuffer, xleft, yupper, step);
 
 	/********** SUBTASK3 END *************************************************/
 	
@@ -138,15 +162,15 @@ int main(int argc,char **argv) {
 	
 	/********** SUBTASK4: Transfer the result from device to device_pixel[][]*/
 
-	//Insert code here
-
+	cudaMemcpy(device_pixel, device_pixelBuffer, sizeof(int)*XSIZE*YSIZE, cudaMemcpyDeviceToHost);
+	
 	/********** SUBTASK4 END *************************************************/
 	
 	memtime+=walltime()-start;
 
 	/********** SUBTASK5: Free the device memory also ************************/
 
-	//Insert code here
+	cudaFree(device_pixelBuffer);
 
 	/********** SUBTASK5 END *************************************************/
 
